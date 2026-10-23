@@ -1,0 +1,30 @@
+name: Developer artifacts (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check && npm test
+      - run: npm run build
+      - run: npm run verify:package
+      - run: npm run verify:replay
+      - run: npm run distribute
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: compacta-developer-macos-arm64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+      # Ad hoc developer artifacts only. No Release or visibility changes.

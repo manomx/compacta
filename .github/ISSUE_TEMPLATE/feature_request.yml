@@ -1,0 +1,17 @@
+name: Feature request / Proponer una mejora
+description: Explain the user problem and a focused proposal.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behavior
+      description: Include a concrete example and relevant alternatives.
+    validations:
+      required: true

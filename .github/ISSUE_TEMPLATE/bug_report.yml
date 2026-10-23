@@ -1,0 +1,40 @@
+name: Bug report / Reportar un problema
+description: A reproducible issue with Compacta.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 'Security issue? Follow SECURITY.md. Do not attach tokens, raw chats, runtime.json, or full state folders. English and Spanish are welcome.'
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Compacta version/commit, macOS, chip, and coding-client version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Use a minimal synthetic conversation or test fixture.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Relevant event names/error codes only; no account or transcript data.
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed credentials, capability URLs, personal data, and real conversation content.
+          required: true

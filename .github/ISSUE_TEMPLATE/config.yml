@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability / Vulnerabilidad
+    url: https://github.com/manomx/compacta/security/advisories/new
+    about: Read SECURITY.md before sharing sensitive details.

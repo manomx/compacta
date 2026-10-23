@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.swift text
+*.mjs text
+*.ts text
+*.md text
+*.svg text
+*.png binary
+*.ttf binary

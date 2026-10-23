@@ -1,0 +1,40 @@
+{
+  "name": "compacta",
+  "version": "1.0.4",
+  "description": "Prepare conversation context in the background. A native macOS companion for coding agents.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "author": "Armando Marroquín Benavides",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/manomx/compacta.git"
+  },
+  "bugs": {
+    "url": "https://github.com/manomx/compacta/issues"
+  },
+  "homepage": "https://github.com/manomx/compacta#readme",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "bun test service/test",
+    "check": "node scripts/check-repository.mjs",
+    "dev:service": "bun service/index.ts",
+    "build": "bash scripts/build.sh",
+    "verify:package": "node scripts/verify-package.mjs",
+    "verify:replay": "bun scripts/verify-null-replay.mjs",
+    "distribute": "bash scripts/distribute.sh",
+    "test:installer": "bash scripts/test-installer.sh",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@iarna/toml": "2.2.5",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "bun": "1.4.3",
+    "prettier": "3.6.2"
+  }
+}
