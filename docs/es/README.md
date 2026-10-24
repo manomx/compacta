@@ -10,13 +10,38 @@ solicita compactar, intenta aplicar ese resumen y conservar completos los pasos
 recientes. Si el historial cambió de verdad o falta trabajo, espera o conserva la
 compactación nativa.
 
-**Estado:** preparación de la primera publicación del código, versión 1.0.4.
-Todavía no hay descarga pública firmada y notarizada. La interfaz actual está en
-español. Proyecto independiente de OpenAI y Anthropic.
+**Estado:** versión 1.0.5. Descarga la app desde
+[GitHub Releases](https://github.com/manomx/compacta/releases) o compílala desde
+el código. Sin notarización, macOS pide abrirla a mano la primera vez. La
+interfaz está en español. Proyecto independiente de OpenAI y Anthropic.
+
+## Descargar
+
+Necesitas Apple Silicon y macOS 14 o posterior.
+
+Descarga `Compacta-<versión>-macOS-arm64.dmg` desde
+[GitHub Releases](https://github.com/manomx/compacta/releases). Abre la imagen y
+arrastra **Compacta** a **Aplicaciones**. Al abrirla, se copia a
+`~/Applications/Compacta.app` e inicia su servicio por usuario. El release
+también incluye un `.zip`.
+
+Si la compilación está notarizada, ábrela con normalidad. Si es ad hoc,
+Gatekeeper la bloquea la primera vez:
+
+- Clic derecho en `Compacta.app` y elige **Abrir**, luego **Abrir**.
+- **Ajustes del Sistema → Privacidad y seguridad → Abrir de todas formas**
+  (Open Anyway).
+- O quita solo la cuarentena de esa copia:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Compacta.app
+```
+
+Eso no desactiva Gatekeeper.
 
 ## Instalar desde el código
 
-Requiere Apple Silicon, macOS 14+, Node.js 22+ y Xcode Command Line Tools.
+Requiere además Node.js 22+ y Xcode Command Line Tools.
 
 ```sh
 git clone https://github.com/manomx/compacta.git

@@ -3,8 +3,11 @@
 - **Early release:** the native Codex path and client internals can change upstream.
   Protocol compatibility is not a stable API guarantee.
 - **Availability:** macOS 14+ and Apple Silicon only. The current UI is Spanish.
-- **Installer trust:** a local/ad hoc build is not Developer ID signed and notarized.
-  A general-download release is blocked until those distribution checks pass.
+- **Installer trust:** a release is ad hoc signed unless the Apple secrets in
+  [releasing](RELEASING.md) are set. Gatekeeper then blocks the first open until
+  you use Right-click → Open, System Settings → Privacy & Security → Open Anyway,
+  or `xattr -dr com.apple.quarantine` on that app. A Developer ID signature can
+  still be blocked until Apple notarizes it. Local source builds are ad hoc too.
 - **Client connections:** new installations apply to new Codex chats / Claude Code
   sessions. Existing sockets do not necessarily migrate immediately.
 - **Latency:** preparation, provider rate limits, an incompatible checkpoint,

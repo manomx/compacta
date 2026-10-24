@@ -7,6 +7,28 @@
 - A coding client already installed and authenticated, or a supported API provider.
 - The app UI is currently Spanish. Intel, Windows, and Linux app builds are not supported.
 
+## Download
+
+Download `Compacta-<version>-macOS-arm64.dmg` from
+[GitHub Releases](https://github.com/manomx/compacta/releases). Open the image
+and drag **Compacta** to **Applications**. The release also includes a `.zip` of
+the same app and `SHA256SUMS.txt`.
+
+A notarized build opens with the usual macOS prompt. An ad hoc build, or a
+Developer ID build that is not notarized yet, is quarantined. Open that copy
+once with any of these:
+
+- Right-click `Compacta.app` and choose **Open**, then **Open**.
+- **System Settings → Privacy & Security → Open Anyway**.
+- Remove only this app's quarantine flag:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Compacta.app
+```
+
+That command does not turn off Gatekeeper. Drag the app to Applications first,
+so the path above is the copy you open.
+
 ## Source build
 
 ```sh
@@ -25,10 +47,9 @@ Building and running verification do not install into your Applications director
 registers the user's launch agent, and opens the installed copy. No administrator
 password is required for that user-scoped location.
 
-The source build uses an ad hoc local signature. It is not a notarized download.
-Do not disable Gatekeeper or remove quarantine as the project's installation
-procedure. A downloaded package that macOS rejects needs correct signing and
-notarization by its distributor. See [releasing](RELEASING.md).
+A source build is ad hoc signed. Opening it from the build folder usually does
+not set a quarantine flag. If macOS blocks it, use the same first-open steps as
+a downloaded ad hoc build. See [releasing](RELEASING.md).
 
 ## Activate
 
