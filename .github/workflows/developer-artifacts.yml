@@ -27,4 +27,4 @@ jobs:
           path: dist/*
           if-no-files-found: error
           retention-days: 7
-      # Ad hoc developer artifacts only. No Release or visibility changes.
+      # Ad hoc developer artifacts only. GitHub Release publishing lives in release.yml.

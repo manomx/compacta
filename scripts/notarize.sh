@@ -7,8 +7,24 @@ if [[ "$COMPACTA_SIGN_IDENTITY" != "Developer ID Application:"* ]]; then
   echo 'A Developer ID Application identity is required.' >&2
   exit 1
 fi
-bash scripts/build.sh
 APP="$PWD/build/Compacta.app"
+# The release workflow builds and verifies first, then sets this to notarize that binary.
+if [[ "${COMPACTA_ASSUME_BUILT:-}" == 1 ]]; then
+  if [[ ! -d "$APP" ]]; then
+    echo 'COMPACTA_ASSUME_BUILT=1 requires build/Compacta.app.' >&2
+    exit 1
+  fi
+  codesign --verify --deep --strict "$APP"
+  authority="$(codesign -dv "$APP" 2>&1 | awk -F= '/^Authority=/{print substr($0, index($0, "=") + 1); exit}')"
+  authority="${authority//$'\r'/}"
+  if [[ "$authority" != "$COMPACTA_SIGN_IDENTITY" ]]; then
+    echo 'build/Compacta.app is not signed with COMPACTA_SIGN_IDENTITY.' >&2
+    echo "Authority: ${authority}" >&2
+    exit 1
+  fi
+else
+  bash scripts/build.sh
+fi
 VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")"
 NAME="Compacta-${VERSION}-macOS-arm64"
 ARCHIVE="$PWD/build/notarization.zip"

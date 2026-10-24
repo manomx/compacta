@@ -7,6 +7,7 @@ file; the initial source publication is still being prepared.
 
 ### Added
 
+- GitHub Release downloads for Apple Silicon: a DMG (drag Compacta to Applications) and a ZIP, built when a `v*` tag is pushed. Developer ID signing and notarization run when the Apple secrets are configured; otherwise the archive is ad hoc signed.
 - Open-source project documentation in English and Spanish.
 - Portable synthetic replay verification and repository hygiene checks.
 - Vector logo, wordmarks, README artwork, and social preview sources.
