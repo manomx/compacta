@@ -577,6 +577,77 @@ test('native Codex may move and refresh tagged AGENTS/environment user items aft
   assert.ok(!JSON.stringify(restored.body.input).includes('Old runtime user context'));
 });
 
+test('dropping generated Page snapshots preserves an in-flight correction across native replay and worker replacement', async (t) => {
+  let modelCalls = 0;
+  const e = await setup(t, async () => {
+    modelCalls++;
+    return { nativeV2: true, output: [native.output[0]] };
+  });
+  const page = (id) => ({
+    ...message(
+      'user',
+      `<external_codex_apps_open_page>${JSON.stringify({ page_id: id })}</external_codex_apps_open_page>`,
+    ),
+    internal_chat_message_metadata_passthrough: {
+      content_item_kinds: ['additional_content.codex_apps_open_page'],
+    },
+  });
+  const correction = message(
+    'user',
+    'Reset only the 16 historical zeros; preserve current submissions.',
+  );
+  const source = [page(null), ...input, page('old-page'), correction];
+  const s = await e.session(e.identity(body, headers, 'test'));
+  s.lastUsage = 100;
+  await e.maybePrepare(s, source, headers, 'test', body);
+  const tail = [
+    {
+      type: 'custom_tool_call',
+      call_id: 'apply-correction',
+      name: 'exec',
+      input: 'apply-approved-correction',
+    },
+    {
+      type: 'custom_tool_call_output',
+      call_id: 'apply-correction',
+      output: 'Running with session_id: 12981; read this process before repeating any write.',
+    },
+  ];
+  const compact = await e.plan({ ...body, input: [...source, ...tail] }, headers, 'test', {
+    isCompact: true,
+    v2: true,
+  });
+  assert.deepEqual(compact.fastOutput, [native.output[0]]);
+  const replacement = new CompactionEngine({
+    root: e.root,
+    compact: async () => {
+      throw Error('recovery must not regenerate the summary');
+    },
+  });
+  await replacement.init();
+  t.after(() => replacement.stop());
+  const replay = [input[0], correction, ...compact.fastOutput];
+  const restored = await replacement.plan({ ...body, input: replay }, headers, 'test');
+  assert.deepEqual(restored.body.input, [input[0], correction, native.output[0], ...tail]);
+  assert.equal(modelCalls, 1);
+  const mixed = {
+    ...page('mixed'),
+    content: [{ type: 'input_text', text: 'Do not apply the correction.' }],
+    internal_chat_message_metadata_passthrough: {
+      content_item_kinds: ['additional_content.codex_apps_open_page', 'user.text'],
+    },
+  };
+  // Generated and authored content together must remain part of the exact history.
+  const mixedSource = [input[0], mixed, input[1]];
+  await e.maybePrepare(s, mixedSource, headers, 'test', body, { force: true });
+  await e.plan({ ...body, input: [...mixedSource, ...tail] }, headers, 'test', {
+    isCompact: true,
+    v2: true,
+  });
+  const omitted = { ...body, input: [input[0], native.output[0]] };
+  assert.strictEqual((await e.plan(omitted, headers, 'test')).body, omitted);
+});
+
 test('runtime instruction refresh while Luna is busy does not discard the completed checkpoint', async (t) => {
   let finish;
   const e = await setup(

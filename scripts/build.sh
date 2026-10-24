@@ -17,7 +17,7 @@ python3 - "$APP" <<'PLIST'
 import sys,plistlib,pathlib,json,os
 p=pathlib.Path(sys.argv[1])/'Contents'
 version=json.loads(pathlib.Path('package.json').read_text())['version']
-info={'CFBundleName':'Compacta','CFBundleDisplayName':'Compacta','CFBundleIdentifier':'io.compacta.app','CFBundleExecutable':'Compacta','CFBundlePackageType':'APPL','CFBundleShortVersionString':version,'CFBundleVersion':os.environ.get('COMPACTA_BUILD_NUMBER','8'),'CFBundleDevelopmentRegion':'es','CFBundleLocalizations':['es'],'LSMinimumSystemVersion':'14.0','LSUIElement':True,'NSHighResolutionCapable':True,'CFBundleIconFile':'Compacta','NSAppleEventsUsageDescription':'Compacta puede abrir una sesión de tu cliente cuando eliges conectar tu cuenta.','NSHumanReadableCopyright':'Copyright 2026. Compacta contributors.'}
+info={'CFBundleName':'Compacta','CFBundleDisplayName':'Compacta','CFBundleIdentifier':'io.compacta.app','CFBundleExecutable':'Compacta','CFBundlePackageType':'APPL','CFBundleShortVersionString':version,'CFBundleVersion':os.environ.get('COMPACTA_BUILD_NUMBER','9'),'CFBundleDevelopmentRegion':'es','CFBundleLocalizations':['es'],'LSMinimumSystemVersion':'14.0','LSUIElement':True,'NSHighResolutionCapable':True,'CFBundleIconFile':'Compacta','NSAppleEventsUsageDescription':'Compacta puede abrir una sesión de tu cliente cuando eliges conectar tu cuenta.','NSHumanReadableCopyright':'Copyright 2026. Compacta contributors.'}
 (p/'Info.plist').write_bytes(plistlib.dumps(info))
 PLIST
 xcrun swift scripts/icon.swift "$APP/Contents/Resources"

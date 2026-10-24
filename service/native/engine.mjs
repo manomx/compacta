@@ -95,6 +95,9 @@ const isReplayRuntime = (i) => {
         'agents_md.instructions',
         'environments.environment_context',
         'goal.internal_context',
+        // Codex drops these generated Page snapshots during native replay.
+        // They identify the current UI, not a user instruction or history branch.
+        'additional_content.codex_apps_open_page',
       ].includes(k),
     )
   );

@@ -21,12 +21,37 @@ const root = await mkdtemp(join(tmpdir(), 'compacta-replay-')),
 let child,
   runtime,
   upstreamRequests = 0,
+  inferenceInput,
+  allowInference = false,
   stderr = '';
 const upstream = http.createServer((req, res) => {
   upstreamRequests++;
-  req.resume();
-  res.writeHead(418, { 'content-type': 'application/json' });
-  res.end(JSON.stringify({ error: { code: 'unexpected_upstream_call' } }));
+  let data = '';
+  req.on('data', (chunk) => (data += chunk));
+  req.on('end', () => {
+    if (allowInference && req.url.endsWith('/responses')) {
+      inferenceInput = JSON.parse(data).input;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          id: 'synthetic-continuation',
+          status: 'completed',
+          output: [
+            {
+              type: 'message',
+              role: 'assistant',
+              phase: 'commentary',
+              content: [{ type: 'output_text', text: 'Continue the existing process.' }],
+            },
+          ],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }),
+      );
+      return;
+    }
+    res.writeHead(418, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: { code: 'unexpected_upstream_call' } }));
+  });
 });
 await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
 const upstreamURL = `http://127.0.0.1:${upstream.address().port}/v1`;
@@ -40,8 +65,23 @@ try {
   );
   const config = defaults();
   config.codex.enabled = true;
+  config.codex.mode = 'threshold';
   await writeFile(join(state, 'settings.json'), JSON.stringify(config), { mode: 0o600 });
+  const page = {
+    type: 'message',
+    role: 'user',
+    content: [
+      {
+        type: 'input_text',
+        text: '<external_codex_apps_open_page>{"page_id":null}</external_codex_apps_open_page>',
+      },
+    ],
+    internal_chat_message_metadata_passthrough: {
+      content_item_kinds: ['additional_content.codex_apps_open_page'],
+    },
+  };
   const source = [
+    page,
     {
       type: 'message',
       role: 'user',
@@ -110,7 +150,7 @@ try {
   const elapsed = [];
   for (const content of [null, [], undefined]) {
     const replay = structuredClone(source);
-    if (content !== undefined) replay[1].content = content;
+    if (content !== undefined) replay[2].content = content;
     const started = performance.now();
     const response = await fetch(
       `http://127.0.0.1:${runtime.codexPort}/${runtime.capability}/v1/responses`,
@@ -125,12 +165,45 @@ try {
     assert.deepEqual((await response.json()).output, nativeOutput);
     elapsed.push(Math.round((performance.now() - started) * 100) / 100);
   }
+  const tail = [
+    {
+      type: 'custom_tool_call',
+      call_id: 'synthetic-correction',
+      name: 'exec',
+      input: 'synthetic-already-launched-correction',
+    },
+    {
+      type: 'custom_tool_call_output',
+      call_id: 'synthetic-correction',
+      output: 'Running with session_id: 12981. Check this process; do not repeat the correction.',
+    },
+  ];
+  const endpoint = `http://127.0.0.1:${runtime.codexPort}/${runtime.capability}/v1/responses`;
+  const compact = await fetch(endpoint, {
+    method: 'POST',
+    headers: { ...headers, 'content-type': 'application/json' },
+    body: JSON.stringify({ ...body, input: [...source, ...tail, { type: 'compaction_trigger' }] }),
+    signal: AbortSignal.timeout(15000),
+  });
+  assert.equal(compact.status, 200);
+  assert.deepEqual((await compact.json()).output, nativeOutput);
+  assert.equal(upstreamRequests, 0);
+  allowInference = true;
+  const continuation = await fetch(endpoint, {
+    method: 'POST',
+    headers: { ...headers, 'content-type': 'application/json' },
+    body: JSON.stringify({ ...body, input: [source[1], ...nativeOutput] }),
+    signal: AbortSignal.timeout(15000),
+  });
+  assert.equal(continuation.status, 200);
+  await continuation.json();
+  assert.deepEqual(inferenceInput, [source[1], ...nativeOutput, ...tail]);
   const response = await fetch(`http://127.0.0.1:${runtime.port}/api/status`, {
     headers: { authorization: 'Bearer ' + runtime.adminToken },
   });
   const status = await response.json();
-  assert.equal(upstreamRequests, 0);
-  assert.equal(status.codex.fastCompactions, 3);
+  assert.equal(upstreamRequests, 1);
+  assert.equal(status.codex.fastCompactions, 4);
   assert.equal(status.codex.prepared, 0);
   assert.equal(status.codex.errors, 0);
   console.log(
@@ -139,7 +212,9 @@ try {
       syntheticData: true,
       externalRequests: 0,
       upstreamRequests,
-      fastCompactions: 3,
+      fastCompactions: 4,
+      pendingProcessRestored: true,
+      generatedPageSnapshotDropped: true,
       newSummaries: 0,
       milliseconds: elapsed,
     }),
