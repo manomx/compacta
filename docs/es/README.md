@@ -10,10 +10,10 @@ solicita compactar, intenta aplicar ese resumen y conservar completos los pasos
 recientes. Si el historial cambió de verdad o falta trabajo, espera o conserva la
 compactación nativa.
 
-**Estado:** versión 1.0.5. Descarga la app desde
+**Estado:** versión 1.1.0. Descarga la app desde
 [GitHub Releases](https://github.com/manomx/compacta/releases) o compílala desde
 el código. Sin notarización, macOS pide abrirla a mano la primera vez. La
-interfaz está en español. Proyecto independiente de OpenAI y Anthropic.
+interfaz está en inglés, español y chino simplificado. Proyecto independiente de OpenAI y Anthropic.
 
 ## Descargar
 

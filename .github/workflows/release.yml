@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Version tag to update, for example v1.0.5. Required when the selected ref is not already that tag.'
+        description: 'Version tag to update, for example v1.1.0. Required when the selected ref is not already that tag.'
         required: false
         type: string
       draft:
@@ -41,6 +41,7 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run test:installer
+      - run: npm run test:localization
       - name: Build and package
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}

@@ -17,11 +17,14 @@ python3 - "$APP" <<'PLIST'
 import sys,plistlib,pathlib,json,os
 p=pathlib.Path(sys.argv[1])/'Contents'
 version=json.loads(pathlib.Path('package.json').read_text())['version']
-info={'CFBundleName':'Compacta','CFBundleDisplayName':'Compacta','CFBundleIdentifier':'io.compacta.app','CFBundleExecutable':'Compacta','CFBundlePackageType':'APPL','CFBundleShortVersionString':version,'CFBundleVersion':os.environ.get('COMPACTA_BUILD_NUMBER','9'),'CFBundleDevelopmentRegion':'es','CFBundleLocalizations':['es'],'LSMinimumSystemVersion':'14.0','LSUIElement':True,'NSHighResolutionCapable':True,'CFBundleIconFile':'Compacta','NSAppleEventsUsageDescription':'Compacta puede abrir una sesión de tu cliente cuando eliges conectar tu cuenta.','NSHumanReadableCopyright':'Copyright 2026. Compacta contributors.'}
+info={'CFBundleName':'Compacta','CFBundleDisplayName':'Compacta','CFBundleIdentifier':'io.compacta.app','CFBundleExecutable':'Compacta','CFBundlePackageType':'APPL','CFBundleShortVersionString':version,'CFBundleVersion':os.environ.get('COMPACTA_BUILD_NUMBER','9'),'CFBundleDevelopmentRegion':'en','CFBundleLocalizations':['en','es','zh-Hans'],'LSMinimumSystemVersion':'14.0','LSUIElement':True,'NSHighResolutionCapable':True,'CFBundleIconFile':'Compacta','NSAppleEventsUsageDescription':'Compacta can open a session in your client when you choose to connect your account.','NSHumanReadableCopyright':'Copyright 2026. Compacta contributors.'}
 (p/'Info.plist').write_bytes(plistlib.dumps(info))
 PLIST
 xcrun swift scripts/icon.swift "$APP/Contents/Resources"
 cp Resources/Fonts/PlusJakartaSans.ttf "$APP/Contents/Resources/PlusJakartaSans.ttf"
+# Interface languages: English (base), Spanish, Simplified Chinese.
+for strings in Resources/Localization/*.lproj/*.strings; do plutil -lint -s "$strings"; done
+cp -R Resources/Localization/*.lproj "$APP/Contents/Resources/"
 cp LICENSE "$APP/Contents/Resources/LICENSE.txt"
 cp node_modules/ws/LICENSE "$APP/Contents/Resources/Licenses/ws.txt"
 cp node_modules/@iarna/toml/LICENSE "$APP/Contents/Resources/Licenses/toml.txt"

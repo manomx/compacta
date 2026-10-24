@@ -14,30 +14,32 @@ import Combine
 
   init(button: NSStatusBarButton, model: AppModel) {
     self.button = button
-    observation = Publishers.CombineLatest(model.$snapshot, model.$connected)
+    observation = Publishers.CombineLatest3(
+      model.$snapshot, model.$connected, LanguageSettings.shared.$language
+    )
       .receive(on: RunLoop.main)
-      .sink { [weak self] snapshot, connected in
+      .sink { [weak self] snapshot, connected, _ in
         let jobs = snapshot?.codex.activeJobs ?? 0
         let busy = connected && jobs > 0
         let state: String
         if !connected {
-          state = "Sin conexión"
+          state = L("status.offline")
         } else if busy {
-          state = "Preparando resumen"
+          state = L("status.preparingSummary")
         } else if snapshot?.config.paused == true {
-          state = "En pausa"
+          state = L("status.paused")
         } else if snapshot?.budgetReached == true {
-          state = "Límite de costo"
+          state = L("status.budget")
         } else {
-          state = "Compactación anticipada"
+          state = L("status.early")
         }
         self?.update(busy: busy, state: state)
       }
   }
 
   private func update(busy: Bool, state: String) {
-    button?.toolTip = "Compacta · \(state)"
-    button?.setAccessibilityLabel("Compacta · \(state)")
+    button?.toolTip = L("status.tooltip", state)
+    button?.setAccessibilityLabel(L("status.tooltip", state))
     guard busy else {
       stop()
       return

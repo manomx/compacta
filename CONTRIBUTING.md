@@ -24,6 +24,7 @@ npm run format:check
 npm test
 # On a supported Mac:
 npm run test:installer
+npm run test:localization
 npm run build
 npm run verify:package
 npm run verify:replay
@@ -33,6 +34,14 @@ Tests must use synthetic data, temporary directories, and local mock providers.
 Do not add tests that silently read real client credentials, contact paid
 providers, or activate an installed integration. New integration checks should
 exercise the compiled binary with an isolated home.
+
+## Interface text
+
+User-facing strings live in `Resources/Localization/<language>.lproj/Localizable.strings`.
+English (`en`) is the base language; add every new key to `en`, `es`, and `zh-Hans`, and
+use it from Swift with `L("key")`. Messages produced by the engine are Spanish and are
+translated for display through `ServiceMessages.strings`. `npm test` fails when a key or
+an engine message is missing in any language.
 
 ## Pull requests
 

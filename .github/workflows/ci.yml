@@ -41,6 +41,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:installer
+      - run: npm run test:localization
       - run: npm run build
       - run: npm run verify:package
       - run: npm run verify:replay

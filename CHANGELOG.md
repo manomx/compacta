@@ -5,8 +5,13 @@ file; the initial source publication is still being prepared.
 
 ## Unreleased
 
+## 1.1.0 — 2026-10-24
+
 ### Added
 
+- English (default) and Simplified Chinese interface alongside Spanish. The first launch
+  follows the macOS language (English when it is not supported); a language menu in
+  Settings changes it right away and is remembered.
 - GitHub Release downloads for Apple Silicon: a DMG (drag Compacta to Applications) and a ZIP, built when a `v*` tag is pushed. Developer ID signing and notarization run when the Apple secrets are configured; otherwise the archive is ad hoc signed.
 - Open-source project documentation in English and Spanish.
 - Portable synthetic replay verification and repository hygiene checks.

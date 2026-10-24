@@ -3,10 +3,17 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 
 const app = resolve(process.argv[2] || 'build/Compacta.app');
+for (const lang of ['en', 'es', 'zh-Hans'])
+  for (const name of ['Localizable', 'InfoPlist'])
+    assert.ok(
+      existsSync(join(app, 'Contents/Resources', `${lang}.lproj`, `${name}.strings`)),
+      `missing ${lang}.lproj/${name}.strings`,
+    );
 const root = await mkdtemp(join(tmpdir(), 'compacta-package-'));
 const home = join(root, 'home'),
   state = join(root, 'state');

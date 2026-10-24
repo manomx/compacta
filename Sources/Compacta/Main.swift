@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @main struct CompactaApplication: App {
@@ -11,12 +12,14 @@ import SwiftUI
   var status: NSStatusItem!
   var popover: NSPopover!
   var statusAnimation: StatusIconAnimator?
+  var languageObservation: AnyCancellable?
   func applicationDidFinishLaunching(_ notification: Notification) {
     if Bootstrap.installIfNeeded() {
       NSApp.terminate(nil)
       return
     }
     NSApp.setActivationPolicy(.accessory)
+    _ = LanguageSettings.shared
     _ = Typeface.available
     model = AppModel()
     window = NSWindow(
@@ -38,7 +41,7 @@ import SwiftUI
       b.image?.accessibilityDescription = "Compacta"
       b.target = self
       b.action = #selector(toggleMenu)
-      b.toolTip = "Compacta · compactación anticipada"
+      b.toolTip = L("app.tooltip")
       statusAnimation = StatusIconAnimator(button: b, model: model)
     }
     popover = NSPopover()
@@ -46,30 +49,38 @@ import SwiftUI
     popover.animates = true
     popover.contentViewController = NSHostingController(
       rootView: MenuPanel(model: model, open: { [weak self] in self?.showWindow() }))
+    buildMenu()
+    // Menus are AppKit objects, so rebuild them when the interface language changes.
+    languageObservation = LanguageSettings.shared.$language.dropFirst()
+      .receive(on: RunLoop.main)
+      .sink { [weak self] _ in self?.buildMenu() }
+    showWindow()
+  }
+  func buildMenu() {
     let menu = NSMenu()
     let appItem = NSMenuItem()
     let appMenu = NSMenu()
     appMenu.addItem(
-      withTitle: "Acerca de Compacta",
+      withTitle: L("menu.about"),
       action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
     appMenu.addItem(.separator())
     appMenu.addItem(
-      withTitle: "Cerrar ventana", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+      withTitle: L("menu.closeWindow"), action: #selector(NSWindow.performClose(_:)),
+      keyEquivalent: "w")
     appMenu.addItem(
-      withTitle: "Salir de Compacta", action: #selector(NSApplication.terminate(_:)),
+      withTitle: L("menu.quit"), action: #selector(NSApplication.terminate(_:)),
       keyEquivalent: "q")
     appItem.submenu = appMenu
     menu.addItem(appItem)
     let edit = NSMenuItem()
-    let editMenu = NSMenu(title: "Edición")
+    let editMenu = NSMenu(title: L("menu.edit"))
     for (title, selector, key) in [
-      ("Deshacer", "undo:", "z"), ("Cortar", "cut:", "x"), ("Copiar", "copy:", "c"),
-      ("Pegar", "paste:", "v"), ("Seleccionar todo", "selectAll:", "a"),
+      (L("menu.undo"), "undo:", "z"), (L("menu.cut"), "cut:", "x"), (L("menu.copy"), "copy:", "c"),
+      (L("menu.paste"), "paste:", "v"), (L("menu.selectAll"), "selectAll:", "a"),
     ] { editMenu.addItem(withTitle: title, action: Selector(selector), keyEquivalent: key) }
     edit.submenu = editMenu
     menu.addItem(edit)
     NSApp.mainMenu = menu
-    showWindow()
   }
   func showWindow() {
     popover?.performClose(nil)

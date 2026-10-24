@@ -16,10 +16,11 @@ ready in the background, so a compatible checkpoint can be applied when Codex
 requests compaction. Recent complete steps are preserved, and changed history is
 checked before a summary is reused.
 
-**Status:** version 1.0.5. Download the macOS app from
+**Status:** version 1.1.0. Download the macOS app from
 [GitHub Releases](https://github.com/manomx/compacta/releases), or build from
 source. A release is notarized when Apple signing secrets are configured; an ad
-hoc build needs the first-open steps below. The current app UI is in Spanish.
+hoc build needs the first-open steps below. The app UI is in English,
+Spanish, and Simplified Chinese.
 Compacta is an independent project, not an OpenAI or Anthropic product.
 
 ## Why Compacta
@@ -140,6 +141,7 @@ See [privacy](docs/PRIVACY.md), [configuration](docs/CONFIGURATION.md), and
 npm run check          # repository hygiene and local documentation links
 npm test               # isolated engine, transport, provider, and policy tests
 npm run test:installer # Swift installer copy/rollback tests; does not install the app
+npm run test:localization # language detection and string tables (needs swiftc)
 npm run build          # native app + compiled service, no obfuscation
 npm run verify:package # isolated compiled-service checks; localhost providers only
 npm run verify:replay  # synthetic checkpoint replay regression, no personal chats
@@ -154,15 +156,17 @@ The automated tests use synthetic transcripts and temporary homes. They do not
 need a paid account. Compiling is separate from installing: `npm run build` does
 not activate a service or change your client configuration.
 
-| Directory             | Purpose                                                     |
-| --------------------- | ----------------------------------------------------------- |
-| `Sources/Compacta/`   | SwiftUI/AppKit app, menu bar state, installer               |
-| `Sources/Vault.swift` | Keychain helper                                             |
-| `service/native/`     | Codex gateway, checkpoint chain, recent-context recovery    |
-| `service/`            | Providers, Claude path, configuration, quotas, usage ledger |
-| `service/test/`       | Synthetic regression tests                                  |
-| `scripts/`            | Build, package, and verification tools                      |
-| `docs/`               | Setup, architecture, privacy, release process, brand assets |
+| Directory                 | Purpose                                                     |
+| ------------------------- | ----------------------------------------------------------- |
+| `Sources/Compacta/`       | SwiftUI/AppKit app, menu bar state, installer               |
+| `Sources/Vault.swift`     | Keychain helper                                             |
+| `service/native/`         | Codex gateway, checkpoint chain, recent-context recovery    |
+| `service/`                | Providers, Claude path, configuration, quotas, usage ledger |
+| `service/test/`           | Synthetic regression tests                                  |
+| `Resources/Localization/` | Interface strings: `en` (base), `es`, `zh-Hans`             |
+| `tests/`                  | String table and translation coverage checks                |
+| `scripts/`                | Build, package, and verification tools                      |
+| `docs/`                   | Setup, architecture, privacy, release process, brand assets |
 
 ## Contributing
 

@@ -21,13 +21,13 @@ then packed by `scripts/distribute.sh`. There is no Xcode project.
 ## Cut a release
 
 `package.json` `version` must be the release number. For the current tree that is
-`1.0.5`, so the tag is `v1.0.5`.
+`1.1.0`, so the tag is `v1.1.0`.
 
 ```sh
 git checkout main
 git pull origin main
-git tag v1.0.5
-git push origin v1.0.5
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 The tag push runs the Release workflow on a GitHub-hosted Apple Silicon runner
@@ -42,7 +42,7 @@ Re-running it replaces those assets. It does not create a git tag. To rebuild
 without a new tag:
 
 ```sh
-gh workflow run release.yml --ref v1.0.5
+gh workflow run release.yml --ref v1.1.0
 ```
 
 A manual run from a branch needs the `tag` input, and that tag must already

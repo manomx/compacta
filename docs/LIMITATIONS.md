@@ -2,7 +2,8 @@
 
 - **Early release:** the native Codex path and client internals can change upstream.
   Protocol compatibility is not a stable API guarantee.
-- **Availability:** macOS 14+ and Apple Silicon only. The current UI is Spanish.
+- **Availability:** macOS 14+ and Apple Silicon only. The UI is available in English, Spanish, and Simplified Chinese;
+  the engine's own log text is Spanish and is translated for display.
 - **Installer trust:** a release is ad hoc signed unless the Apple secrets in
   [releasing](RELEASING.md) are set. Gatekeeper then blocks the first open until
   you use Right-click → Open, System Settings → Privacy & Security → Open Anyway,

@@ -5,7 +5,7 @@
 - Apple Silicon (arm64), macOS 14 or later.
 - Node.js 22+ and Xcode Command Line Tools for a source build.
 - A coding client already installed and authenticated, or a supported API provider.
-- The app UI is currently Spanish. Intel, Windows, and Linux app builds are not supported.
+- The app UI is available in English, Spanish, and Simplified Chinese. Intel, Windows, and Linux app builds are not supported.
 
 ## Download
 

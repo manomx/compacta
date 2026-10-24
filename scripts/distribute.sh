@@ -32,6 +32,12 @@ if [[ ! -f "$RAW" ]]; then
 fi
 hdiutil attach "$RAW" -mountpoint "$MOUNT" -nobrowse -noverify -noautoopen
 ditto "$APP" "$MOUNT/Compacta.app"
+for lang in en es zh-Hans; do
+  if [[ ! -f "$MOUNT/Compacta.app/Contents/Resources/$lang.lproj/Localizable.strings" ]]; then
+    printf 'Interface language %s is missing from the disk image.\n' "$lang" >&2
+    exit 1
+  fi
+done
 cp docs/DOWNLOAD_README.txt "$MOUNT/README.txt"
 ln -s /Applications "$MOUNT/Applications"
 if [[ "$(readlink "$MOUNT/Applications")" != /Applications ]]; then

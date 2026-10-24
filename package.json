@@ -1,6 +1,6 @@
 {
   "name": "compacta",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "Prepare conversation context in the background. A native macOS companion for coding agents.",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "bun test service/test",
+    "test": "bun test service/test tests",
     "check": "node scripts/check-repository.mjs",
     "dev:service": "bun service/index.ts",
     "build": "bash scripts/build.sh",
@@ -26,6 +26,7 @@
     "verify:replay": "bun scripts/verify-null-replay.mjs",
     "distribute": "bash scripts/distribute.sh",
     "test:installer": "bash scripts/test-installer.sh",
+    "test:localization": "bash scripts/test-localization.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
