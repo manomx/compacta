@@ -11,7 +11,12 @@ type RecordInfo = {
   previousRoute?: any;
   note?: string;
 };
-export function editRootString(text: string, key: string, value: string | null) {
+export function editRootString(
+  text: string,
+  key: string,
+  value: string | null,
+  claimRoute = false,
+) {
   const before: any = TOML.parse(text || '');
   const lines = text.split(/\r?\n/);
   let root = true,
@@ -30,6 +35,14 @@ export function editRootString(text: string, key: string, value: string | null) 
       if (found) throw Error('Clave duplicada en configuración.');
       found = true;
       lines[i] = value === null ? '' : `${key} = ${JSON.stringify(value)}`;
+      if (
+        claimRoute &&
+        key === 'openai_base_url' &&
+        value !== null &&
+        i > 0 &&
+        lines[i - 1].includes('# Auto-injected by opencodex')
+      )
+        lines[i - 1] = '# Managed by Compacta; the original provider remains upstream.';
     }
   }
   if (!found && value !== null) lines.unshift(`${key} = ${JSON.stringify(value)}`);
@@ -62,6 +75,7 @@ async function text(path: string) {
 }
 export class Integrations {
   records: Record<string, RecordInfo> = { codex: { active: false }, claude: { active: false } };
+  private reconcilingCodex = false;
   constructor(
     public root: string,
     public home = homedir(),
@@ -85,7 +99,11 @@ export class Integrations {
     return {
       codex: {
         detected: !!codexText,
-        active: this.records.codex.active,
+        active:
+          this.records.codex.active &&
+          codex.openai_base_url === this.records.codex.installedURL &&
+          (!codex.model_provider || codex.model_provider === 'openai') &&
+          !codex.model_providers?.openai?.base_url,
         legacy: !!legacy,
         model: codex.model || '',
         note: this.records.codex.note || '',
@@ -116,12 +134,55 @@ export class Integrations {
     const conf = await readJSON(join(this.home, '.claude/settings.json'), {});
     return conf.env?.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
   }
+  async reconcileCodexRouting() {
+    const r = this.records.codex;
+    if (!r.active || !r.installedURL || this.reconcilingCodex) return false;
+    this.reconcilingCodex = true;
+    try {
+      const path = join(this.home, '.codex/config.toml');
+      const original = await text(path);
+      const parsed: any = TOML.parse(original || '');
+      if (parsed.model_provider && parsed.model_provider !== 'openai') return false;
+      if (parsed.model_providers?.openai?.base_url) return false;
+      const legacy =
+        r.mode === 'legacy'
+          ? await readJSON(join(this.home, '.codex/compactacion-anticipada/deployment.json'))
+          : null;
+      const knownUpstreams = [
+        r.original?.baseURL,
+        legacy?.upstream,
+        legacy?.originalBaseUrl,
+      ].filter((value) => typeof value === 'string' && value !== 'auto');
+      if (
+        parsed.openai_base_url !== r.installedURL &&
+        !knownUpstreams.includes(parsed.openai_base_url)
+      )
+        return false;
+      const updated = editRootString(original, 'openai_base_url', r.installedURL, true);
+      if (updated === original) return false;
+      await mkdir(join(this.root, 'backups'), { recursive: true, mode: 0o700 });
+      await writeFile(join(this.root, 'backups', `codex-route-${Date.now()}.toml`), original, {
+        mode: 0o600,
+      });
+      if ((await text(path)) !== original) return false;
+      await writeFile(path, updated, { mode: 0o600 });
+      return true;
+    } finally {
+      this.reconcilingCodex = false;
+    }
+  }
   async activateCodex(
     url: string,
     worker: { port: number; capability: string; instance: string; version: string },
   ) {
     const r = this.records.codex;
-    if (r.active) return;
+    if (r.active) {
+      await this.reconcileCodexRouting();
+      if ((await this.detect()).codex.active) return;
+      throw Error(
+        'La conexión de Codex cambió a otro proveedor. Desconecta y vuelve a conectar Compacta para adoptar esa ruta.',
+      );
+    }
     const path = join(this.home, '.codex/config.toml'),
       original = await text(path),
       parsed: any = TOML.parse(original || '');
@@ -151,6 +212,7 @@ export class Integrations {
       };
       await this.persist();
       try {
+        await this.reconcileCodexRouting();
         await atomicJSON(join(legacyRoot, 'route.json'), { ...worker, restart: false });
       } catch (e) {
         this.records.codex = r;
@@ -168,7 +230,9 @@ export class Integrations {
       };
       await this.persist();
       try {
-        await writeFile(path, editRootString(original, 'openai_base_url', url), { mode: 0o600 });
+        await writeFile(path, editRootString(original, 'openai_base_url', url, true), {
+          mode: 0o600,
+        });
       } catch (e) {
         this.records.codex = r;
         await this.persist();

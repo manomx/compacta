@@ -522,6 +522,51 @@ test('ambiguous, incomplete or oversized recent history falls back to full nativ
   }
 });
 
+test('large completed tool results survive a fast compaction when the prepared prefix substantially shrinks the window', async (t) => {
+  let calls = 0;
+  const e = await setup(t, async () => {
+    calls++;
+    return { nativeV2: true, output: [native.output[0]] };
+  });
+  const source = [input[0], message('assistant', 'prior history '.repeat(180000))];
+  const s = await e.session(e.identity(body, headers, 'test'));
+  s.lastUsage = 100;
+  await e.maybePrepare(s, source, headers, 'test', body);
+  const tail = [
+    {
+      type: 'custom_tool_call',
+      call_id: 'large-result',
+      name: 'exec',
+      input: 'completed-operation',
+    },
+    {
+      type: 'custom_tool_call_output',
+      call_id: 'large-result',
+      output: 'RESULTS_ALREADY_OBTAINED: ' + 'evidence '.repeat(165000),
+    },
+  ];
+  const p = await e.plan({ ...body, input: [...source, ...tail] }, headers, 'test', {
+    isCompact: true,
+    v2: true,
+  });
+  assert.deepEqual(p.fastOutput, [native.output[0]]);
+  const replacement = new CompactionEngine({
+    root: e.root,
+    compact: () => {
+      throw Error('must not wait for a new summary');
+    },
+  });
+  await replacement.init();
+  t.after(() => replacement.stop());
+  const next = await replacement.plan(
+    { ...body, input: [input[0], ...p.fastOutput] },
+    headers,
+    'test',
+  );
+  assert.deepEqual(next.body.input, [input[0], native.output[0], ...tail]);
+  assert.equal(calls, 1);
+});
+
 test('failure to persist the tail never acknowledges a lossy fast compaction', async (t) => {
   const e = await setup(t, async () => ({ nativeV2: true, output: [native.output[0]] }));
   await prepare(e);

@@ -511,6 +511,23 @@ export class CompactionEngine {
     if (!match) return;
     const tail = logical.slice(match.cut),
       nativeOutput = ready.nativeOutput || ready.output;
+    const tailBytes = Buffer.byteLength(JSON.stringify(tail));
+    // Large completed tool results can exceed 64 KiB even when the prepared
+    // prefix removes most of a long chat. Persist that exact tail when the
+    // reconstructed window still shrinks substantially, rather than waiting
+    // for several queued model summaries to catch up.
+    const recoverableTail =
+      tailBytes <= 65536 ||
+      (tailBytes <= 8 * 1024 * 1024 &&
+        Buffer.byteLength(
+          JSON.stringify([
+            ...retainedV2Input(logical.slice(0, match.cut)),
+            ...nativeOutput,
+            ...(ready.externalHandoff ? [ready.externalHandoff] : []),
+            ...tail,
+          ]),
+        ) <=
+          Buffer.byteLength(JSON.stringify(logical)) * 0.75);
     const clientRetainsTail = v2 && ready.nativeV2 && tail.every(isRetainedV2Item);
     let canKeepTail =
       v2 &&
@@ -518,7 +535,7 @@ export class CompactionEngine {
       safeCut(logical) === logical.length &&
       nativeOutput.length === 1 &&
       nativeOutput[0].type === 'compaction' &&
-      Buffer.byteLength(JSON.stringify(tail)) <= 65536;
+      recoverableTail;
     if (canKeepTail && (ready.externalHandoff || tail.some((i) => !isRetainedV2Item(i)))) {
       try {
         await this.saveTail(
@@ -555,6 +572,7 @@ export class CompactionEngine {
         coveredTurns: ready.coveredTurns || 0,
         clientRetained: tail.filter(isRetainedV2Item).length,
         savedTail: canKeepTail ? tail.length : 0,
+        savedTailBytes: canKeepTail ? tailBytes : 0,
         backgroundJobs: s.jobs.size,
       });
       return clone(v2 ? nativeOutput : preparedWindow(logical, ready, match.cut));

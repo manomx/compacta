@@ -92,7 +92,13 @@ try {
       type: 'message',
       role: 'assistant',
       phase: 'final_answer',
-      content: [{ type: 'output_text', text: 'Synthetic result T992 remains pending.' }],
+      content: [
+        {
+          type: 'output_text',
+          text:
+            'Synthetic result T992 remains pending. ' + 'Older completed evidence. '.repeat(100000),
+        },
+      ],
     },
   ];
   const nativeOutput = [{ type: 'compaction', encrypted_content: 'SYNTHETIC_CHECKPOINT' }];
@@ -175,7 +181,9 @@ try {
     {
       type: 'custom_tool_call_output',
       call_id: 'synthetic-correction',
-      output: 'Running with session_id: 12981. Check this process; do not repeat the correction.',
+      output:
+        'Running with session_id: 12981. Check this process; do not repeat the correction. ' +
+        'Recent completed evidence. '.repeat(60000),
     },
   ];
   const endpoint = `http://127.0.0.1:${runtime.codexPort}/${runtime.capability}/v1/responses`;
@@ -215,6 +223,7 @@ try {
       fastCompactions: 4,
       pendingProcessRestored: true,
       generatedPageSnapshotDropped: true,
+      largeRecentToolBytes: Buffer.byteLength(JSON.stringify(tail)),
       newSummaries: 0,
       milliseconds: elapsed,
     }),

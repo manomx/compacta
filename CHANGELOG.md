@@ -20,6 +20,14 @@ file; the initial source publication is still being prepared.
 - Update `ws` to 8.22.0 to address known WebSocket advisories.
 - Keep personal verification reports and account-specific harnesses out of the repository.
 
+## 1.0.6 — 2026-10-27
+
+### Fixed
+
+- Claim Compacta's route independently of OpenCodex's generated routing marker, so catalog synchronization preserves the compaction connection.
+- Recover an enabled integration if its configuration reverts to its known upstream. Report the actual configured connection instead of a stale activation flag, and preserve unrelated provider changes.
+- Preserve completed recent tool results larger than 64 KiB when the prepared prefix still substantially reduces the context window. This avoids waiting for several pending summaries on long chats.
+
 ## 1.0.5 — 2026-10-23
 
 ### Fixed
