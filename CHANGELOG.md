@@ -5,8 +5,22 @@ file; the initial source publication is still being prepared.
 
 ## Unreleased
 
+## 1.1.1 — 2026-10-27
+
+### Fixed
+
+- Claim Compacta's route independently of OpenCodex's generated routing marker, so catalog synchronization preserves the compaction connection.
+- Recover an enabled integration if its configuration reverts to its known upstream. Report the actual configured connection instead of a stale activation flag, and preserve unrelated provider changes.
+- Preserve completed recent tool results larger than 64 KiB when the prepared prefix still substantially reduces the context window. This avoids waiting for several pending summaries on long chats.
+
+## 1.1.0 — 2026-10-24
+
 ### Added
 
+- English (default) and Simplified Chinese interface alongside Spanish. The first launch
+  follows the macOS language (English when it is not supported); a language menu in
+  Settings changes it right away and is remembered.
+- GitHub Release downloads for Apple Silicon: a DMG (drag Compacta to Applications) and a ZIP, built when a `v*` tag is pushed. Developer ID signing and notarization run when the Apple secrets are configured; otherwise the archive is ad hoc signed.
 - Open-source project documentation in English and Spanish.
 - Portable synthetic replay verification and repository hygiene checks.
 - Vector logo, wordmarks, README artwork, and social preview sources.
@@ -19,14 +33,6 @@ file; the initial source publication is still being prepared.
 - Pin the build runtime and keep distribution artifacts under `dist/`.
 - Update `ws` to 8.22.0 to address known WebSocket advisories.
 - Keep personal verification reports and account-specific harnesses out of the repository.
-
-## 1.0.6 — 2026-10-27
-
-### Fixed
-
-- Claim Compacta's route independently of OpenCodex's generated routing marker, so catalog synchronization preserves the compaction connection.
-- Recover an enabled integration if its configuration reverts to its known upstream. Report the actual configured connection instead of a stale activation flag, and preserve unrelated provider changes.
-- Preserve completed recent tool results larger than 64 KiB when the prepared prefix still substantially reduces the context window. This avoids waiting for several pending summaries on long chats.
 
 ## 1.0.5 — 2026-10-23
 

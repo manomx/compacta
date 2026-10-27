@@ -12,7 +12,7 @@ unchecked until there is direct evidence.
 - [x] Contribution and conduct guidance, CODEOWNERS, issue and PR templates.
 - [x] Pinned build runtime, lockfile, CI, and dependency update configuration.
 - [x] Portable synthetic verification; personal reports excluded.
-- [x] Explicit signing/notarization procedure and manual artifact workflow.
+- [x] Release workflow packages a DMG and ZIP on version tags. Signing and notarization run when Apple secrets are configured.
 
 ## Maintainer verification before making public
 
@@ -31,5 +31,6 @@ unchecked until there is direct evidence.
 - [ ] Review bundled-runtime redistribution obligations.
 - [ ] Attach final checksums and clearly written release notes.
 
-A source release can precede a consumer binary release, provided the README keeps
-that distinction clear.
+Pushing a `v*` tag publishes the DMG and ZIP. Without the Apple secrets, that
+download is ad hoc signed and the README explains the first open. Notarization
+still depends on those secrets and on a clean-machine check of the downloaded file.

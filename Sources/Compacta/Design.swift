@@ -303,7 +303,7 @@ struct NeuMenu<T: Hashable>: View {
       }
     } label: {
       HStack(spacing: 8) {
-        Text(options.first(where: { $0.0 == selection })?.1 ?? "Elegir").font(jf(12.5, .semibold))
+        Text(options.first(where: { $0.0 == selection })?.1 ?? L("menu.choose")).font(jf(12.5, .semibold))
           .foregroundStyle(Neu.text).lineLimit(1)
         Spacer(minLength: 4)
         Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .bold))
@@ -446,7 +446,7 @@ struct NeuGauge: View {
   var percent: Double
   var warning = false
   var size: CGFloat = 96
-  var caption = "% usado"
+  var caption = L("gauge.used")
   @State private var shown = false
   var body: some View {
     let ring = size - 20

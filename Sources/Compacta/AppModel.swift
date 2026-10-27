@@ -17,13 +17,13 @@ import SwiftUI
     "Library/Application Support/Compacta")
   var dirty: Bool { draft != snapshot?.config }
   var statusTitle: String {
-    guard connected else { return "Sin conexión" }
-    guard let s = snapshot else { return "Iniciando" }
-    if s.config.paused { return "En pausa" }
-    if s.budgetReached { return "Límite de costo" }
-    if s.codex.activeJobs + s.claude.activeJobs > 0 { return "Preparando" }
-    if !s.integration.codex.active && !s.integration.claude.active { return "Sin activar" }
-    return "Activo"
+    guard connected else { return L("status.offline") }
+    guard let s = snapshot else { return L("status.starting") }
+    if s.config.paused { return L("status.paused") }
+    if s.budgetReached { return L("status.budget") }
+    if s.codex.activeJobs + s.claude.activeJobs > 0 { return L("status.preparing") }
+    if !s.integration.codex.active && !s.integration.claude.active { return L("status.inactive") }
+    return L("status.active")
   }
   var jobs: Int { (snapshot?.codex.activeJobs ?? 0) + (snapshot?.claude.activeJobs ?? 0) }
   init() { Task { await connect() } }
@@ -48,7 +48,7 @@ import SwiftUI
         }
         try await Task.sleep(for: .milliseconds(250))
       }
-      throw AppError.message("El servicio no respondió. Abre Diagnóstico para revisar el inicio.")
+      throw AppError.message(L("error.serviceNoResponse"))
     } catch {
       self.error = error.localizedDescription
       connected = false
@@ -79,7 +79,7 @@ import SwiftUI
   }
   func request<T: Decodable>(_ path: String, body: Data?) async throws -> T {
     guard let runtime, let url = URL(string: "http://127.0.0.1:\(runtime.port)\(path)") else {
-      throw AppError.message("Compacta está iniciando.")
+      throw AppError.message(L("error.starting"))
     }
     var req = URLRequest(url: url)
     req.httpMethod = body == nil ? "GET" : "POST"
@@ -91,7 +91,7 @@ import SwiftUI
     guard let h = response as? HTTPURLResponse, (200..<300).contains(h.statusCode) else {
       let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
       throw AppError.message(
-        obj?["error"] as? String ?? "El servicio no pudo completar la operación.")
+        (obj?["error"] as? String).map(LS) ?? L("error.operationFailed"))
     }
     return try JSONDecoder().decode(T.self, from: data)
   }
@@ -105,7 +105,7 @@ import SwiftUI
       snapshot = s
       self.draft = s.config
       try Bootstrap.setLogin(enabled: draft.launchAtLogin)
-      showNotice("Ajustes guardados")
+      showNotice(L("notice.saved"))
     } catch { self.error = error.localizedDescription }
   }
   func setPaused(_ value: Bool) async {
@@ -115,7 +115,7 @@ import SwiftUI
       let s: Snapshot = try await post("/api/pause", ["paused": value])
       snapshot = s
       draft = s.config
-      showNotice(value ? "Preparación en pausa" : "Preparación reanudada")
+      showNotice(value ? L("notice.paused") : L("notice.resumed"))
     } catch { self.error = error.localizedDescription }
   }
   struct Activation: Decodable {
@@ -132,9 +132,9 @@ import SwiftUI
         snapshot = s
         draft = s.config
       }
-      if !r.ok { throw AppError.message(r.errors.joined(separator: "\n")) }
+      if !r.ok { throw AppError.message(r.errors.map(LS).joined(separator: "\n")) }
       try Bootstrap.setLogin(enabled: draft?.launchAtLogin ?? true)
-      showNotice("Integraciones actualizadas")
+      showNotice(L("notice.integrations"))
     } catch { self.error = error.localizedDescription }
   }
   func refreshQuotas() async {
@@ -143,7 +143,7 @@ import SwiftUI
     do {
       let _: QuotaResult = try await post("/api/quotas/refresh", [:])
       await refresh()
-      showNotice("Límites actualizados")
+      showNotice(L("notice.quotas"))
     } catch { self.error = error.localizedDescription }
   }
   struct QuotaResult: Decodable { var quotas: [String: Quota] }
@@ -157,7 +157,7 @@ import SwiftUI
   func testProvider(_ id: String) async -> String {
     do {
       let p: Probe = try await post("/api/provider/test", ["id": id])
-      return "\(p.message) \(p.milliseconds) ms · \(p.model)"
+      return L("probe.result", LS(p.message), p.milliseconds, p.model)
     } catch { return error.localizedDescription }
   }
   func saveProvider(_ p: Provider, key: String) async throws {
@@ -171,12 +171,12 @@ import SwiftUI
     snapshot = s
     draft = s.config
     if !key.isEmpty { let _: OK = try await post("/api/credentials", ["id": p.id, "key": key]) }
-    showNotice("Proveedor guardado")
+    showNotice(L("notice.providerSaved"))
   }
   func removeProvider(_ id: String) async {
     guard var settings = draft else { return }
     if settings.codex.providerID == id || settings.claude.providerID == id {
-      error = "Este proveedor está seleccionado para compactar. Elige otro antes de quitarlo."
+      error = L("error.providerInUse")
       return
     }
     settings.providers.removeAll { $0.id == id }
@@ -196,7 +196,7 @@ import SwiftUI
   }
   func exportUsage() async {
     let panel = NSSavePanel()
-    panel.nameFieldStringValue = "Compacta-consumo.json"
+    panel.nameFieldStringValue = L("export.filename")
     panel.allowedContentTypes = [.json]
     guard panel.runModal() == .OK, let url = panel.url else { return }
     do {
@@ -205,10 +205,10 @@ import SwiftUI
       r.setValue("Bearer \(runtime.adminToken)", forHTTPHeaderField: "Authorization")
       let (data, response) = try await URLSession.shared.data(for: r)
       guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-        throw AppError.message("No se pudo exportar.")
+        throw AppError.message(L("error.exportFailed"))
       }
       try data.write(to: url, options: .atomic)
-      showNotice("Registro exportado sin conversaciones ni claves")
+      showNotice(L("notice.exported"))
     } catch { self.error = error.localizedDescription }
   }
   func showNotice(_ value: String) {
@@ -232,7 +232,7 @@ import SwiftUI
     let script = "tell application \"Terminal\"\nactivate\ndo script \"\(command)\"\nend tell"
     var error: NSDictionary?
     NSAppleScript(source: script)?.executeAndReturnError(&error)
-    if error != nil { self.error = "Abre Terminal y ejecuta \(command) para iniciar sesión." }
+    if error != nil { self.error = L("error.openTerminal", command) }
   }
 }
 enum AppError: LocalizedError {
@@ -254,7 +254,7 @@ enum Bootstrap {
     try p.run()
     p.waitUntilExit()
     if p.terminationStatus != 0 {
-      throw AppError.message("No se pudo registrar el servicio de Compacta.")
+      throw AppError.message(L("error.registerService"))
     }
   }
   static func ensureService(root: URL) throws {
@@ -270,8 +270,7 @@ enum Bootstrap {
     let engine = helpers.appendingPathComponent("compacta-engine").path
     let vault = helpers.appendingPathComponent("compacta-vault").path
     guard fm.isExecutableFile(atPath: engine) else {
-      throw AppError.message(
-        "El paquete está incompleto: falta el motor. Vuelve a instalar Compacta.")
+      throw AppError.message(L("error.missingEngine"))
     }
     let agents = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents")
     try fm.createDirectory(at: agents, withIntermediateDirectories: true)

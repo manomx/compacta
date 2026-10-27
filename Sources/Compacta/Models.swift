@@ -17,7 +17,7 @@ struct Provider: Codable, Identifiable, Equatable {
   var extraHeaders: [String: String]
   static var new: Provider {
     Provider(
-      id: UUID().uuidString, name: "Nueva API", kind: "compatible", auth: "key",
+      id: UUID().uuidString, name: L("provider.newName"), kind: "compatible", auth: "key",
       baseURL: "https://api.openai.com/v1", model: "", contextWindow: 200000, inputPrice: nil,
       outputPrice: nil, cachePrice: nil, cacheWritePrice: nil, priceSource: "Tarifa personalizada",
       priceDate: ISO8601DateFormatter().string(from: Date()), extraHeaders: [:])
@@ -149,12 +149,13 @@ struct Runtime: Decodable {
   var pid: Int
 }
 enum Page: String, CaseIterable, Identifiable {
-  case overview = "Resumen"
-  case compaction = "Compactación"
-  case providers = "Modelos y API"
-  case activity = "Actividad"
-  case settings = "Ajustes"
+  case overview
+  case compaction
+  case providers
+  case activity
+  case settings
   var id: String { rawValue }
+  var title: String { L("page." + rawValue) }
   var symbol: String {
     switch self {
     case .overview: "square.grid.2x2"
@@ -164,15 +165,7 @@ enum Page: String, CaseIterable, Identifiable {
     case .settings: "slider.horizontal.3"
     }
   }
-  var subtitle: String {
-    switch self {
-    case .overview: "Todo lo que necesitas saber, de un vistazo."
-    case .compaction: "Elige cuándo preparar el contexto y qué conservar."
-    case .providers: "Tus cuentas, tus modelos y tus propias API."
-    case .activity: "Consumo medido y lo que está haciendo Compacta."
-    case .settings: "Haz que Compacta trabaje a tu manera."
-    }
-  }
+  var subtitle: String { L("page." + rawValue + ".subtitle") }
 }
 extension Int {
   var compact: String {
@@ -182,7 +175,9 @@ extension Int {
   }
 }
 func currency(_ n: Double) -> String {
-  n.formatted(.currency(code: "USD").precision(.fractionLength(n < 0.01 && n > 0 ? 4 : 2)))
+  n.formatted(
+    .currency(code: "USD").precision(.fractionLength(n < 0.01 && n > 0 ? 4 : 2))
+      .locale(Strings.shared.locale))
 }
 func parsedDate(_ s: String) -> Date? {
   let f = ISO8601DateFormatter()
@@ -190,6 +185,10 @@ func parsedDate(_ s: String) -> Date? {
   return f.date(from: s) ?? ISO8601DateFormatter().date(from: s)
 }
 func relativeReset(_ s: String?) -> String {
-  guard let s, let d = parsedDate(s) else { return "Reinicio no informado" }
-  return "Reinicia " + d.formatted(.relative(presentation: .named))
+  guard let s, let d = parsedDate(s) else { return L("reset.unknown") }
+  return L("reset.relative", relativeDate(d))
 }
+func relativeDate(_ d: Date) -> String {
+  d.formatted(.relative(presentation: .named).locale(Strings.shared.locale))
+}
+func percentText(_ n: Int) -> String { L("format.percent", n) }

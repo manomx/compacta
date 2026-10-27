@@ -16,9 +16,12 @@ ready in the background, so a compatible checkpoint can be applied when Codex
 requests compaction. Recent complete steps are preserved, and changed history is
 checked before a summary is reused.
 
-**Status:** early release preparation, version 1.0.4. Build from source today.
-A signed, notarized public download is not available yet. The current app UI is
-in Spanish. Compacta is an independent project, not an OpenAI or Anthropic product.
+**Status:** version 1.1.0. Download the macOS app from
+[GitHub Releases](https://github.com/manomx/compacta/releases), or build from
+source. A release is notarized when Apple signing secrets are configured; an ad
+hoc build needs the first-open steps below. The app UI is in English,
+Spanish, and Simplified Chinese.
+Compacta is an independent project, not an OpenAI or Anthropic product.
 
 ## Why Compacta
 
@@ -39,9 +42,34 @@ outputs, provider limits, and genuinely changed history can require more work.
 
 ## Get started
 
-You need an **Apple Silicon Mac running macOS 14 or later**, Node.js 22 or later,
-Xcode Command Line Tools, and an existing coding-client account or provider API key.
-Bun is pinned in the npm lockfile and installed by `npm ci`.
+You need an **Apple Silicon Mac running macOS 14 or later** and an existing
+coding-client account or provider API key. Building from source also needs
+Node.js 22 or later and Xcode Command Line Tools. Bun is pinned in the npm
+lockfile and installed by `npm ci`.
+
+### Download
+
+Download `Compacta-<version>-macOS-arm64.dmg` from
+[GitHub Releases](https://github.com/manomx/compacta/releases). Open the disk
+image and drag **Compacta** to **Applications**. Opening it copies the app to
+`~/Applications/Compacta.app` and starts the per-user service. Each release
+also includes a `.zip` of the same app and `SHA256SUMS.txt`.
+
+A notarized build opens normally. If that tag was built without Apple Developer
+ID secrets, the app is ad hoc signed and Gatekeeper quarantines it. Use one of
+these once, then open the app:
+
+- Right-click `Compacta.app` and choose **Open**, then **Open**.
+- **System Settings → Privacy & Security → Open Anyway**.
+- Clear the quarantine flag on the copy you open:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Compacta.app
+```
+
+That command does not turn off Gatekeeper.
+
+### Build from source
 
 ```sh
 git clone https://github.com/manomx/compacta.git
@@ -113,25 +141,32 @@ See [privacy](docs/PRIVACY.md), [configuration](docs/CONFIGURATION.md), and
 npm run check          # repository hygiene and local documentation links
 npm test               # isolated engine, transport, provider, and policy tests
 npm run test:installer # Swift installer copy/rollback tests; does not install the app
+npm run test:localization # language detection and string tables (needs swiftc)
 npm run build          # native app + compiled service, no obfuscation
 npm run verify:package # isolated compiled-service checks; localhost providers only
 npm run verify:replay  # synthetic checkpoint replay regression, no personal chats
 npm run distribute    # local developer ZIP/DMG under dist/
 ```
 
+Pushing a version tag (`v*`, matching `package.json`) runs the release workflow
+and attaches that DMG and ZIP to the GitHub Release. `npm run distribute` only
+fills `dist/`. See [releasing](docs/RELEASING.md).
+
 The automated tests use synthetic transcripts and temporary homes. They do not
 need a paid account. Compiling is separate from installing: `npm run build` does
 not activate a service or change your client configuration.
 
-| Directory             | Purpose                                                     |
-| --------------------- | ----------------------------------------------------------- |
-| `Sources/Compacta/`   | SwiftUI/AppKit app, menu bar state, installer               |
-| `Sources/Vault.swift` | Keychain helper                                             |
-| `service/native/`     | Codex gateway, checkpoint chain, recent-context recovery    |
-| `service/`            | Providers, Claude path, configuration, quotas, usage ledger |
-| `service/test/`       | Synthetic regression tests                                  |
-| `scripts/`            | Build, package, and verification tools                      |
-| `docs/`               | Setup, architecture, privacy, release process, brand assets |
+| Directory                 | Purpose                                                     |
+| ------------------------- | ----------------------------------------------------------- |
+| `Sources/Compacta/`       | SwiftUI/AppKit app, menu bar state, installer               |
+| `Sources/Vault.swift`     | Keychain helper                                             |
+| `service/native/`         | Codex gateway, checkpoint chain, recent-context recovery    |
+| `service/`                | Providers, Claude path, configuration, quotas, usage ledger |
+| `service/test/`           | Synthetic regression tests                                  |
+| `Resources/Localization/` | Interface strings: `en` (base), `es`, `zh-Hans`             |
+| `tests/`                  | String table and translation coverage checks                |
+| `scripts/`                | Build, package, and verification tools                      |
+| `docs/`                   | Setup, architecture, privacy, release process, brand assets |
 
 ## Contributing
 

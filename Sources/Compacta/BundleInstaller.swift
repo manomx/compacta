@@ -2,7 +2,7 @@ import Foundation
 
 enum BundleInstallError: LocalizedError {
   case incomplete
-  var errorDescription: String? { "El paquete de Compacta está incompleto. Vuelve a descargarlo." }
+  var errorDescription: String? { L("error.incompleteBundle") }
 }
 
 enum BundleInstaller {

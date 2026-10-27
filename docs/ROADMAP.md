@@ -4,7 +4,7 @@ This is a direction for contributions, not a delivery schedule.
 
 ## Before general binary distribution
 
-- Developer ID signing, notarization, stapling, and a clean-machine installation test.
+- Clean-machine installation test of a downloaded release. The tag workflow notarizes when the Apple secrets in [releasing](RELEASING.md) are set.
 - Confirm default model availability and compatibility against documented client versions.
 - Enable private vulnerability reporting and review the public repository settings.
 - Review a real Codex manual and automatic compaction flow from the release candidate.
