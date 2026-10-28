@@ -24,7 +24,7 @@ import { createGateway } from './native/server.mjs';
 import { codexPolicyHash, externalCodexSummary } from './policy';
 
 async function main() {
-  const version = '1.1.1';
+  const version = '1.1.2';
   const args = process.argv.slice(2);
   const arg = (n: string) => args[args.indexOf(n) + 1];
   const root = args.includes('--root')

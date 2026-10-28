@@ -5,6 +5,15 @@ file; the initial source publication is still being prepared.
 
 ## Unreleased
 
+## 1.1.2 — 2026-10-28
+
+### Fixed
+
+- Restore recent assistant and tool steps when native replay assigns image detail settings or drops a generated interruption marker. Image bytes, authored text, and actual history changes remain protected.
+- Preserve recent interruption warnings while keeping native replay comparison independent of the client's generated markers.
+- Recover existing saved tails only when the archived source proves the full retained history and the exact opaque summary. Leave previous records intact for rollback.
+- Verify continuation after replay changes with the compiled app, alongside rejection of edited messages and changed images.
+
 ## 1.1.1 — 2026-10-27
 
 ### Fixed

@@ -101,6 +101,25 @@ try {
       ],
     },
   ];
+  const image = {
+    type: 'message',
+    role: 'user',
+    content: [
+      { type: 'input_text', text: 'Keep the exact approved diagram.' },
+      { type: 'input_image', image_url: 'data:image/png;base64,U1lOVEhFVElDLUlNQUdF' },
+    ],
+  };
+  source.push(image, {
+    type: 'message',
+    role: 'user',
+    content: [
+      {
+        type: 'input_text',
+        text: '<turn_aborted>Check prior effects before retrying.</turn_aborted>',
+      },
+    ],
+    internal_chat_message_metadata_passthrough: { content_item_kinds: ['generic.turn_aborted'] },
+  });
   const nativeOutput = [{ type: 'compaction', encrypted_content: 'SYNTHETIC_CHECKPOINT' }];
   const headers = { 'thread-id': 'synthetic-replay', authorization: 'Bearer local-fixture' };
   const body = { model: 'synthetic-model', input: source, stream: false };
@@ -197,15 +216,17 @@ try {
   assert.deepEqual((await compact.json()).output, nativeOutput);
   assert.equal(upstreamRequests, 0);
   allowInference = true;
+  const replayImage = structuredClone(image);
+  replayImage.content[1].detail = 'high';
   const continuation = await fetch(endpoint, {
     method: 'POST',
     headers: { ...headers, 'content-type': 'application/json' },
-    body: JSON.stringify({ ...body, input: [source[1], ...nativeOutput] }),
+    body: JSON.stringify({ ...body, input: [source[1], replayImage, ...nativeOutput] }),
     signal: AbortSignal.timeout(15000),
   });
   assert.equal(continuation.status, 200);
   await continuation.json();
-  assert.deepEqual(inferenceInput, [source[1], ...nativeOutput, ...tail]);
+  assert.deepEqual(inferenceInput, [source[1], replayImage, ...nativeOutput, ...tail]);
   const response = await fetch(`http://127.0.0.1:${runtime.port}/api/status`, {
     headers: { authorization: 'Bearer ' + runtime.adminToken },
   });
@@ -223,6 +244,8 @@ try {
       fastCompactions: 4,
       pendingProcessRestored: true,
       generatedPageSnapshotDropped: true,
+      nativeImageDetailChanged: true,
+      interruptionMarkerDropped: true,
       largeRecentToolBytes: Buffer.byteLength(JSON.stringify(tail)),
       newSummaries: 0,
       milliseconds: elapsed,

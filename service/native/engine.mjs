@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile, rename, link, unlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, link, unlink, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export const hash = (x) =>
@@ -102,6 +102,28 @@ const isReplayRuntime = (i) => {
     )
   );
 };
+// Codex removes its own interruption marker from replacement history. Keep
+// the warning in saved recent steps, but do not use it as a replay cursor.
+// Authored text that happens to contain the same tag is still protected.
+const isReplayControl = (i) => {
+  const kinds = i.internal_chat_message_metadata_passthrough?.content_item_kinds;
+  return (
+    i.role === 'user' &&
+    Array.isArray(kinds) &&
+    kinds.length > 0 &&
+    kinds.every((k) => k === 'generic.turn_aborted')
+  );
+};
+const isReplayAnchor = (i) => isRetainedV2Item(i) && !isReplayRuntime(i) && !isReplayControl(i);
+export const retainedReplayFingerprints = (items) =>
+  items.filter(isReplayAnchor).map((item) => {
+    const x = normalize(item);
+    // Replacement history adds `original` or `high` to the same image bytes.
+    // Resolution is transport metadata; image contents and authored text stay exact.
+    if (Array.isArray(x.content))
+      for (const block of x.content) if (block.type === 'input_image') delete block.detail;
+    return hash(x);
+  });
 export const conversationFingerprints = (items) =>
   fingerprints(items.filter((i) => !isRuntimeInstruction(i)));
 export function completesTurn(response) {
@@ -197,8 +219,7 @@ export function preparedMatch(items, prepared) {
   // user history; the expanded transcript need not be reconstructed.
   if (prepared.nativeV2 && prepared.nativeOutput?.length === 1) {
     const summary = hash(normalize(prepared.nativeOutput[0]));
-    const retained = (xs) =>
-      fingerprints(xs.filter((i) => isRetainedV2Item(i) && !isReplayRuntime(i)));
+    const retained = retainedReplayFingerprints;
     for (let i = items.length - 1; i >= 0; i--)
       if (items[i].type === 'compaction' && hash(normalize(items[i])) === summary) {
         if (hash(retained(items.slice(0, i))) === hash(retained(prepared.output))) {
@@ -637,10 +658,9 @@ export class CompactionEngine {
   // Save the exact unsummarized suffix before acknowledging compaction, then
   // restore it only when the client replays that summary and retained history.
   async saveTail(scope, key, logical, cut, summary, leading = []) {
-    const retained = (items) =>
-      fingerprints(items.filter((i) => isRetainedV2Item(i) && !isReplayRuntime(i)));
+    const retained = retainedReplayFingerprints;
     const record = {
-      version: 1,
+      version: 2,
       scope,
       summary: hash(normalize(summary)),
       retained: retained(logical),
@@ -659,12 +679,66 @@ export class CompactionEngine {
       } catch (error) {
         if (error.code !== 'EEXIST') throw error;
         const existing = JSON.parse(await readFile(path, 'utf8'));
-        if (existing.digest !== hash(record)) throw Error('ambiguous_tail_checkpoint');
+        const { digest, ...saved } = existing;
+        if (digest !== hash(saved) || hash({ ...saved, version: 2 }) !== hash(record))
+          throw Error('ambiguous_tail_checkpoint');
       }
     } finally {
       await unlink(tmp);
     }
     this.log('recent_tail_saved', { key, items: record.tail.length });
+  }
+  async migrateLegacyTail(scope, key, summary, retained) {
+    let archive, ready;
+    try {
+      archive = JSON.parse(await readFile(join(this.root, 'archive', key + '.json'), 'utf8'));
+      ready = JSON.parse(await readFile(join(this.root, 'cache', key + '.json'), 'utf8'));
+    } catch (error) {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    }
+    if (
+      !Array.isArray(archive.items) ||
+      archive.created !== ready.created ||
+      ready.nativeOutput?.length !== 1 ||
+      hash(normalize(ready.nativeOutput[0])) !== hash(normalize(summary))
+    )
+      return null;
+    const legacyRetained = (items) =>
+      fingerprints(items.filter((i) => isRetainedV2Item(i) && !isReplayRuntime(i)));
+    const prefix = legacyRetained(archive.items);
+    // Old records contain only fingerprints. The archived source must prove
+    // every protected item before publishing a cursor in the new format.
+    for (const name of await readdir(this.tailRoot)) {
+      if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
+      const record = JSON.parse(await readFile(join(this.tailRoot, name), 'utf8'));
+      if (
+        record.version !== 1 ||
+        record.scope !== scope ||
+        record.summary !== hash(normalize(summary))
+      )
+        continue;
+      const { digest, ...saved } = record;
+      if (
+        digest !== hash(saved) ||
+        record.prefixCount !== prefix.length ||
+        !Array.isArray(record.tail) ||
+        !Array.isArray(record.retained) ||
+        hash(record.retained.slice(0, record.prefixCount)) !== hash(prefix)
+      )
+        continue;
+      const source = [...archive.items, ...record.tail];
+      if (
+        hash(legacyRetained(source)) !== hash(record.retained) ||
+        hash(retainedReplayFingerprints(source)) !== hash(retained)
+      )
+        continue;
+      await this.saveTail(scope, key, source, archive.items.length, summary);
+      this.log('recent_tail_migrated', { key, items: record.tail.length });
+      const id = hash({ scope, summary: record.summary, retained });
+      return JSON.parse(await readFile(join(this.tailRoot, id + '.json'), 'utf8'));
+    }
+    return null;
   }
   async restoreTail(logical, scope, key) {
     for (let pos = logical.length - 1; pos >= 0; pos--) {
@@ -672,20 +746,19 @@ export class CompactionEngine {
       const summary = hash(normalize(logical[pos]));
       const before = logical.slice(0, pos);
       if (before.some((i) => !isRetainedV2Item(i))) return null;
-      const retained = fingerprints(
-        before.filter((i) => isRetainedV2Item(i) && !isReplayRuntime(i)),
-      );
+      const retained = retainedReplayFingerprints(before);
       const id = hash({ scope, summary, retained });
       let record;
       try {
         record = JSON.parse(await readFile(join(this.tailRoot, id + '.json'), 'utf8'));
       } catch (error) {
-        if (error.code === 'ENOENT') return null;
-        throw error;
+        if (error.code !== 'ENOENT') throw error;
+        record = await this.migrateLegacyTail(scope, key, logical[pos], retained);
+        if (!record) return null;
       }
       const { digest, ...saved } = record;
       if (
-        record.version !== 1 ||
+        ![1, 2].includes(record.version) ||
         digest !== hash(saved) ||
         record.scope !== scope ||
         record.summary !== summary ||
@@ -704,7 +777,7 @@ export class CompactionEngine {
         return null;
       let rank = 0;
       const prefix = before.filter((i) => {
-        if (!isRetainedV2Item(i) || isReplayRuntime(i)) return true;
+        if (!isReplayAnchor(i)) return true;
         return rank++ < record.prefixCount;
       });
       this.log('recent_tail_restored', { key, items: record.tail.length });
