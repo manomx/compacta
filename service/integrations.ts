@@ -313,7 +313,7 @@ export class Integrations {
     if (!r?.config) return;
     const c = await readJSON(r.config);
     if (!c?.root) return;
-    for (const dir of ['cache', 'archive'])
+    for (const dir of ['cache', 'archive', 'objects'])
       try {
         await cp(join(c.root, dir), join(destination, dir), {
           recursive: true,

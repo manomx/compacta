@@ -1,6 +1,6 @@
 {
   "name": "compacta",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Prepare conversation context in the background. A native macOS companion for coding agents.",
   "private": true,
   "type": "module",

@@ -5,6 +5,15 @@ file; the initial source publication is still being prepared.
 
 ## Unreleased
 
+## 1.1.3 — 2026-10-28
+
+### Fixed
+
+- Share compressed copies of repeated images, instructions and tool output between durable checkpoints and archives. Existing records migrate only after exact recovery verification; all conversation checkpoints remain available.
+- Move incremental response history out of the resident response cache and load it only when its response ID is used. A disk error retains the in-memory fallback.
+- Release inactive in-memory histories and retain compact checkpoint fingerprints instead of duplicated source transcripts. Preserve the full saved context and exact continuation after restarting the service.
+- Automatically remove only unreferenced stored objects. Keep simultaneous summaries unlimited when configured to zero.
+
 ## 1.1.2 — 2026-10-28
 
 ### Fixed

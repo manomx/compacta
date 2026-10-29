@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, link, unlink, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { SnapshotStore } from './storage.mjs';
 
 export const hash = (x) =>
   createHash('sha256')
@@ -22,7 +23,7 @@ export function stable(x) {
 }
 export const clone = (x) => JSON.parse(JSON.stringify(x));
 export function normalize(item) {
-  const x = clone(item);
+  const x = { ...item };
   // These fields describe transport, not conversational contents. call_id is never removed.
   delete x.status;
   // Codex strips response metadata on replay for reasoning and tools as well
@@ -30,6 +31,7 @@ export function normalize(item) {
   // change to the conversation; encrypted content and call_id stay exact.
   for (const field of ['metadata', 'internal_chat_message_metadata_passthrough']) {
     if (x[field] && typeof x[field] === 'object' && !Array.isArray(x[field])) {
+      x[field] = { ...x[field] };
       for (const key of ['turn_id', 'create_time', 'content_item_kinds']) delete x[field][key];
       if (!Object.keys(x[field]).length) delete x[field];
     }
@@ -61,7 +63,7 @@ export function normalize(item) {
       x.content = x.content.map((b) => {
         if (b.type === 'output_text' || b.type === 'input_text')
           return { type: 'input_text', text: b.text };
-        return b;
+        return { ...b };
       });
   }
   return x;
@@ -144,6 +146,13 @@ function changedFields(a, b, path = '') {
       .slice(0, 12);
   return [path || '/'];
 }
+function diagnosticValue(value) {
+  if (typeof value === 'string' && value.length > 256) return '[sha256:' + hash(value) + ']';
+  if (Array.isArray(value)) return value.map(diagnosticValue);
+  if (value && typeof value === 'object')
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, diagnosticValue(v)]));
+  return value;
+}
 export function mismatchDetails(items, prepared, source = []) {
   const current = items.filter((i) => !isRuntimeInstruction(i)),
     previous = source.filter((i) => !isRuntimeInstruction(i));
@@ -162,7 +171,12 @@ export function mismatchDetails(items, prepared, source = []) {
         index: i,
         type: current[i].type,
         role: current[i].role,
-        fields: previous[i] ? changedFields(normalize(previous[i]), normalize(current[i])) : [],
+        fields: previous[i]
+          ? changedFields(
+              diagnosticValue(normalize(previous[i])),
+              diagnosticValue(normalize(current[i])),
+            )
+          : [],
         expectedHash: expected[i],
         actualHash: hash(normalize(current[i])),
       };
@@ -222,7 +236,10 @@ export function preparedMatch(items, prepared) {
     const retained = retainedReplayFingerprints;
     for (let i = items.length - 1; i >= 0; i--)
       if (items[i].type === 'compaction' && hash(normalize(items[i])) === summary) {
-        if (hash(retained(items.slice(0, i))) === hash(retained(prepared.output))) {
+        if (
+          hash(retained(items.slice(0, i))) ===
+          hash(prepared.retainedReplayPrefix || retained(prepared.output))
+        ) {
           let cut = i + 1;
           if (
             prepared.externalHandoff &&
@@ -274,6 +291,14 @@ export async function atomicJSON(path, data) {
   await writeFile(tmp, JSON.stringify(data), { mode: 0o600 });
   await rename(tmp, path);
 }
+function residentCheckpoint(ready) {
+  if (!ready?.nativeV2 || !ready.nativeOutput) return ready;
+  return {
+    ...ready,
+    retainedReplayPrefix: ready.retainedReplayPrefix || retainedReplayFingerprints(ready.output),
+    output: [],
+  };
+}
 
 export class CompactionEngine {
   constructor({
@@ -310,6 +335,7 @@ export class CompactionEngine {
       waitForPending,
     });
     this.tailRoot = tailRoot;
+    this.store = new SnapshotStore(root);
     // Zero means no global limit; each chat still has one ordered summary chain.
     this.maxConcurrent =
       Number.isSafeInteger(maxConcurrent) && maxConcurrent >= 0 ? maxConcurrent : 0;
@@ -387,7 +413,7 @@ export class CompactionEngine {
     this.sessions.set(key, s);
     s.loaded = (async () => {
       try {
-        const d = JSON.parse(await readFile(join(this.root, 'cache', key + '.json'), 'utf8'));
+        const d = await this.store.read(join(this.root, 'cache', key + '.json'));
         if (
           d.version === 2 &&
           d.policy === this.policy &&
@@ -395,16 +421,16 @@ export class CompactionEngine {
           Array.isArray(d.prefix) &&
           Array.isArray(d.output)
         ) {
-          s.ready = d;
           s.completedTurns = d.coveredTurns || 0;
           s.lastCompletedTurnId = d.coveredTurnId || null;
-          const a = JSON.parse(await readFile(join(this.root, 'archive', key + '.json'), 'utf8'));
+          const a = await this.store.read(join(this.root, 'archive', key + '.json'));
           if (a.created === d.created && Array.isArray(a.items)) {
-            s.readySource = a.items;
+            s.readyDiagnostic = a.items.map(diagnosticValue);
             // Recompute transport-independent coverage for checkpoints from 1.0.1.
             d.prefix = fingerprints(a.items);
             d.conversationPrefix = conversationFingerprints(a.items);
           }
+          s.ready = residentCheckpoint(d);
         }
       } catch {}
     })();
@@ -418,12 +444,34 @@ export class CompactionEngine {
       }
     return s;
   }
-  logicalInput(body, key) {
+  async logicalInput(body, key) {
     if (!Array.isArray(body.input)) return null;
     if (body.previous_response_id) {
-      const prev = this.lastResponses.get(body.previous_response_id);
+      let prev = this.lastResponses.get(body.previous_response_id);
+      if (!prev) {
+        const path = join(
+          this.root,
+          'responses',
+          hash({ key, id: body.previous_response_id }) + '.json',
+        );
+        try {
+          const saved = await this.store.read(path);
+          if (
+            saved.key !== key ||
+            saved.id !== body.previous_response_id ||
+            !Array.isArray(saved.items)
+          )
+            return null;
+          return [...saved.items, ...cleanInput(body.input)];
+        } catch (error) {
+          if (error.code === 'ENOENT') return null;
+          throw error;
+        }
+      }
       if (!prev || prev.key !== key) return null;
-      return [...prev.items, ...cleanInput(body.input)];
+      if (prev.writing) await prev.writing;
+      const items = prev.items || (await this.store.read(prev.path)).items;
+      return [...items, ...cleanInput(body.input)];
     }
     return cleanInput(body.input);
   }
@@ -433,7 +481,7 @@ export class CompactionEngine {
   async plan(body, headers, upstream, { isCompact = false, v2 = false } = {}) {
     const key = this.identity(body, headers, upstream);
     if (!key) return { body, key: null, logical: null };
-    let logical = this.logicalInput(body, key);
+    let logical = await this.logicalInput(body, key);
     if (!logical) return { body, key, logical: null };
     const threadId =
       headers['thread-id'] ||
@@ -691,8 +739,8 @@ export class CompactionEngine {
   async migrateLegacyTail(scope, key, summary, retained) {
     let archive, ready;
     try {
-      archive = JSON.parse(await readFile(join(this.root, 'archive', key + '.json'), 'utf8'));
-      ready = JSON.parse(await readFile(join(this.root, 'cache', key + '.json'), 'utf8'));
+      archive = await this.store.read(join(this.root, 'archive', key + '.json'));
+      ready = await this.store.read(join(this.root, 'cache', key + '.json'));
     } catch (error) {
       if (error.code === 'ENOENT') return null;
       throw error;
@@ -806,9 +854,29 @@ export class CompactionEngine {
     const output = Array.isArray(response.output) ? response.output : [];
     const history = [...plan.logical, ...output];
     if (response.id) {
-      this.lastResponses.set(response.id, { key: plan.key, items: history });
-      while (this.lastResponses.size > 48)
-        this.lastResponses.delete(this.lastResponses.keys().next().value);
+      const path = join(this.root, 'responses', hash({ key: plan.key, id: response.id }) + '.json');
+      const entry = { key: plan.key, path, items: history };
+      this.lastResponses.set(response.id, entry);
+      entry.writing = this.store
+        .write(path, { key: plan.key, id: response.id, items: history })
+        .then(() => {
+          delete entry.items;
+        })
+        .catch(() => {
+          // A disk failure keeps the in-memory fallback; it must never lose a turn.
+          this.log('response_snapshot_save_failed', { key: plan.key });
+        })
+        .finally(() => {
+          delete entry.writing;
+        });
+      while (this.lastResponses.size > 48) {
+        const id = this.lastResponses.keys().next().value,
+          old = this.lastResponses.get(id);
+        this.lastResponses.delete(id);
+        Promise.resolve(old.writing)
+          .then(() => old.path && this.store.remove(old.path))
+          .catch(() => {});
+      }
     }
     if (plan.step != null && plan.step !== s.step) return;
     if (completesTurn(response)) {
@@ -949,13 +1017,14 @@ export class CompactionEngine {
     const start = performance.now();
     try {
       if (match?.cut === cut) return;
-      if (s.ready && !matches)
+      if (s.ready && !matches) {
         this.log('checkpoint_mismatch', {
           key: s.key,
           threadId: s.threadId,
           sequence,
-          ...mismatchDetails(source, s.ready, s.readySource || []),
+          ...mismatchDetails(source, s.ready, s.readyDiagnostic || []),
         });
+      }
       this.log('prepare_started', {
         key: s.key,
         threadId: s.threadId,
@@ -996,7 +1065,7 @@ export class CompactionEngine {
         throw Error('native_compaction_failed');
       const output = response.nativeV2
         ? [
-            ...clone(retainedV2Input(source)),
+            ...retainedV2Input(source),
             ...clone(response.output),
             ...(response.externalHandoff ? [clone(response.externalHandoff)] : []),
           ]
@@ -1012,6 +1081,7 @@ export class CompactionEngine {
         output,
         nativeOutput: clone(response.output),
         nativeV2: !!response.nativeV2,
+        retainedReplayPrefix: retainedReplayFingerprints(source),
         ...(response.externalHandoff ? { externalHandoff: clone(response.externalHandoff) } : {}),
         nativeMs: Math.round(performance.now() - start),
         sourceChars: JSON.stringify(source).length,
@@ -1035,14 +1105,15 @@ export class CompactionEngine {
             this.log('prepare_superseded', { key: s.key, sequence });
             return;
           }
-          await atomicJSON(join(this.root, 'archive', s.key + '.json'), {
+          await this.store.write(join(this.root, 'archive', s.key + '.json'), {
             version: 1,
             created: ready.created,
             items: source,
           });
-          await atomicJSON(join(this.root, 'cache', s.key + '.json'), ready);
-          s.ready = ready;
-          s.readySource = source;
+          await this.store.write(join(this.root, 'cache', s.key + '.json'), ready);
+          s.ready = residentCheckpoint(ready);
+          s.readySource = null;
+          s.readyDiagnostic = source.map(diagnosticValue);
           s.committed = sequence;
           s.lastError = null;
           this.stats.prepared++;
@@ -1074,14 +1145,45 @@ export class CompactionEngine {
       this.activeJobs--;
       job.resolve();
       this.drain();
+      this.releaseIdleMemory();
     }
   }
   stop() {
     this.closed = true;
+    this.store.stopping = true;
     clearTimeout(this.wakeTimer);
     for (const s of this.sessions.values()) {
       s.pending?.resolve();
       s.pending = null;
+    }
+  }
+  async flush() {
+    await Promise.allSettled([...this.sessions.values()].map((s) => s.commit));
+    if (this.store.optimizing) await this.store.optimizing.catch(() => {});
+    while (this.store.locks.size) await Promise.allSettled([...this.store.locks.values()]);
+  }
+  releaseIdleMemory(now = Date.now()) {
+    let released = 0;
+    for (const s of this.sessions.values()) {
+      if (s.jobs.size || s.pending || s.waiters || now - s.seenAt < 30000) continue;
+      if (s.latestInput) {
+        s.latestMatch = preparedMatch(s.latestInput, s.ready);
+        s.latestInput = null;
+        s.readySource = null;
+        released++;
+      }
+    }
+    return released;
+  }
+  maintain() {
+    this.releaseIdleMemory();
+    if (!this.store.optimizing)
+      this.store.optimize().catch(() => {
+        this.store.stats.errors++;
+      });
+    if (this.store.stats.complete && Date.now() - (this.lastCollection || 0) > 3600000) {
+      this.lastCollection = Date.now();
+      this.store.collectGarbage().catch(() => {});
     }
   }
   status() {
@@ -1094,14 +1196,19 @@ export class CompactionEngine {
       maxConcurrent: this.maxConcurrent,
       maxPerSession: 1,
       ...this.stats,
+      storage: this.store.stats,
+      responseSnapshotsInMemory: [...this.lastResponses.values()].filter((r) => r.items).length,
+      residentHistories: [...this.sessions.values()].filter((s) => s.latestInput).length,
       activeJobs: this.activeJobs,
       pendingSessions: [...this.sessions.values()].filter((s) => s.pending).length,
       sessions: [...this.sessions.values()].map((s) => {
         const match = s.latestInput
             ? preparedMatch(s.latestInput, s.ready)
-            : s.ready
-              ? { cut: s.ready.prefix.length }
-              : null,
+            : s.latestMatch !== undefined
+              ? s.latestMatch
+              : s.ready
+                ? { cut: s.ready.prefix.length }
+                : null,
           valid = !!match;
         return {
           key: s.key,

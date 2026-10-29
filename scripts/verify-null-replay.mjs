@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { defaults } from '../service/config.ts';
 import { codexPolicyHash } from '../service/policy.ts';
+import { SnapshotStore } from '../service/native/storage.mjs';
 import {
   CompactionEngine,
   fingerprints,
@@ -157,6 +158,9 @@ try {
   await writeFile(join(state, 'codex/cache', key + '.json'), JSON.stringify(cache), {
     mode: 0o600,
   });
+  const migratedStorage = await new SnapshotStore(join(state, 'codex')).optimize();
+  assert.equal(migratedStorage.errors, 0);
+  assert.equal(migratedStorage.migrated, 2);
   child = spawn(
     join(app, 'Contents/Helpers/compacta-engine'),
     ['--root', state, '--vault', join(app, 'Contents/Helpers/compacta-vault'), '--no-quotas'],
@@ -243,6 +247,7 @@ try {
       upstreamRequests,
       fastCompactions: 4,
       pendingProcessRestored: true,
+      migratedStorageRecovered: true,
       generatedPageSnapshotDropped: true,
       nativeImageDetailChanged: true,
       interruptionMarkerDropped: true,

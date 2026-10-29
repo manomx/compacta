@@ -706,7 +706,7 @@ export async function createGateway(config) {
         for (const c of nativeCalls) c.abort();
         wss.clients.forEach((c) => c.terminate());
         wss.close();
-        server.close(ok);
+        server.close(() => engine.flush().then(ok, ok));
         server.closeAllConnections();
       }),
   };

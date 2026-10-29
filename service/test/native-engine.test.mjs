@@ -299,7 +299,11 @@ test('v2 keeps exact user instructions through repeated compaction and returns o
     ),
     ack = message('assistant', 'Recibido.');
   await e.maybePrepare(s, [...input, correction, ack], headers, 'test', body);
-  assert.deepEqual(s.ready.output, [input[0], correction, native.output[0]]);
+  assert.deepEqual((await e.store.read(join(e.root, 'cache', s.key + '.json'))).output, [
+    input[0],
+    correction,
+    native.output[0],
+  ]);
   assert.deepEqual(requests[1].input, [input[0], native.output[0], correction, ack]);
   const next = message('user', 'Conserva las dos referencias.');
   const normal = await e.plan(

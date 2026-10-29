@@ -24,7 +24,7 @@ import { createGateway } from './native/server.mjs';
 import { codexPolicyHash, externalCodexSummary } from './policy';
 
 async function main() {
-  const version = '1.1.2';
+  const version = '1.1.3';
   const args = process.argv.slice(2);
   const arg = (n: string) => args[args.indexOf(n) + 1];
   const root = args.includes('--root')
@@ -597,6 +597,7 @@ async function main() {
     const enabled = cfg.value.codex.enabled && !cfg.value.paused && canSpend();
     gateway.engine.enabled = enabled;
     nativeConfig.enabled = enabled;
+    gateway.engine.maintain();
     if (!args.includes('--no-quotas'))
       quotas.refresh(false, cfg.value.pollSeconds * 1000).catch(() => {});
   }, 10000);
